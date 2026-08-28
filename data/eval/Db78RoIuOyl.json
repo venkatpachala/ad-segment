@@ -1,0 +1,20 @@
+{
+  "source": {
+    "url": "https://www.instagram.com/reel/Db78RoIuOyl/",
+    "platform": "instagram",
+    "kind": "short",
+    "duration_s": 22.567,
+    "processed_at": "2026-08-28T20:03:23Z",
+    "language": "telugu"
+  },
+  "segments": [],
+  "stats": {
+    "wall_clock_s": 14.2,
+    "estimated_cost_usd": 0.0,
+    "frames_sampled": 46,
+    "frames_ocrd": 19,
+    "ocr_wall_s": 4.13,
+    "model_calls": 0,
+    "llm_fallback": "skipped"
+  }
+}

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv/
+.pytest_cache/
+
+# Secrets — never commit
+.env
+*.cookies.txt
+data/youtube.cookies.txt
+data/instagram.cookies.txt
+
+# Media cache and run artifacts (multi-GB)
+data/cache/
+data/uploads/
+data/runs/
+data/cache/judge/
+
+# Windows portable Tesseract (240MB). System tesseract or local tree is fine at runtime.
+tesseract/
+
+# Scratch JSON from ad-hoc runs (keep data/eval/ and ground_truth)
+data/*.json
+!data/ground_truth.json
+!data/eval/
+data/*.jsom
+data/*.jsonl
+data/*.jpg
+data/*.mp4
+data/*.mp3
+data/v1_frame_*.jpg
+
+# Keep shipped fixtures and frozen eval
+!data/fixtures/
+!data/fixtures/*.mp4
+!data/eval/*.json
+!data/eval/*.jsonl

@@ -1,0 +1,20 @@
+{
+  "source": {
+    "url": "https://www.youtube.com/watch?v=s0LLVQeMmtU",
+    "platform": "youtube",
+    "kind": "live",
+    "duration_s": 662.0,
+    "processed_at": "2026-08-28T20:02:48Z",
+    "language": ""
+  },
+  "segments": [],
+  "stats": {
+    "wall_clock_s": 178.87,
+    "estimated_cost_usd": 0.0,
+    "frames_sampled": 1324,
+    "frames_ocrd": 548,
+    "ocr_wall_s": 37.02,
+    "model_calls": 0,
+    "llm_fallback": ""
+  }
+}

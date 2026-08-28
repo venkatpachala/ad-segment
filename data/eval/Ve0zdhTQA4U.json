@@ -1,0 +1,53 @@
+{
+  "source": {
+    "url": "https://www.youtube.com/shorts/Ve0zdhTQA4U",
+    "platform": "youtube",
+    "kind": "short",
+    "duration_s": 63.893,
+    "processed_at": "2026-08-28T19:49:22Z",
+    "language": "te"
+  },
+  "segments": [
+    {
+      "id": "seg_01",
+      "start_s": 4.5,
+      "end_s": 63.89,
+      "ad_type": "other",
+      "confidence": 0.95,
+      "brand": "Avis Vascular Center",
+      "description": "Persistent lower-third commercial overlay. OCR: brand_word, phone.",
+      "evidence": {
+        "frame_timestamps": [
+          4.5,
+          5.0,
+          5.5,
+          6.0,
+          6.5,
+          7.0,
+          7.5,
+          8.0,
+          8.5,
+          9.0,
+          9.5,
+          10.0
+        ],
+        "transcript_span": "",
+        "ocr_text": "Avis Vascular Center | 89297 21641",
+        "transcript_lang": "",
+        "signals_used": [
+          "ocr"
+        ]
+      },
+      "presentation": "overlay"
+    }
+  ],
+  "stats": {
+    "wall_clock_s": 17.85,
+    "estimated_cost_usd": 0.0,
+    "frames_sampled": 128,
+    "frames_ocrd": 28,
+    "ocr_wall_s": 7.8,
+    "model_calls": 0,
+    "llm_fallback": "skipped"
+  }
+}

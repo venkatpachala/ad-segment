@@ -1,0 +1,48 @@
+{
+  "source": {
+    "url": "https://www.instagram.com/reel/DJl6-v8oufg",
+    "platform": "instagram",
+    "kind": "short",
+    "duration_s": 12.979,
+    "processed_at": "2026-08-28T20:04:03Z",
+    "language": "english"
+  },
+  "segments": [
+    {
+      "id": "seg_01",
+      "start_s": 1.0,
+      "end_s": 12.98,
+      "ad_type": "other",
+      "confidence": 0.95,
+      "brand": "Asian Dental / Dr. Samskruti",
+      "description": "Persistent lower-third commercial overlay. OCR: brand_word, cta.",
+      "evidence": {
+        "frame_timestamps": [
+          1.0,
+          1.5,
+          9.0,
+          9.5,
+          10.0,
+          12.0,
+          12.5
+        ],
+        "transcript_span": "",
+        "ocr_text": "Asian Dental / Dr. Samskruti | Jubliee Hills",
+        "transcript_lang": "",
+        "signals_used": [
+          "ocr"
+        ]
+      },
+      "presentation": "overlay"
+    }
+  ],
+  "stats": {
+    "wall_clock_s": 19.27,
+    "estimated_cost_usd": 0.0,
+    "frames_sampled": 26,
+    "frames_ocrd": 26,
+    "ocr_wall_s": 4.73,
+    "model_calls": 0,
+    "llm_fallback": "skipped"
+  }
+}

@@ -1,0 +1,163 @@
+{
+  "policy_version": "1.1.2",
+  "videos": [
+    {
+      "source": {
+        "url": "https://www.youtube.com/watch?v=ujFWRFYLGjY",
+        "platform": "youtube",
+        "kind": "vod",
+        "duration_s": 2805.853,
+        "processed_at": "2026-08-28T00:00:00Z"
+      },
+      "segments": [
+        {
+          "id": "seg_01",
+          "start_s": 0.0,
+          "end_s": 7.0,
+          "ad_type": "preroll",
+          "confidence": 1.0,
+          "brand": "Vista Imaging",
+          "description": "Channel-inserted opening commercial for Vista Imaging (Banjara Hills CT / scan) before the podcast intros begin.",
+          "evidence": {
+            "frame_timestamps": [0.5, 3.0, 6.0],
+            "transcript_span": "",
+            "signals_used": ["ocr", "scene_cut"]
+          },
+          "annotation": {
+            "human_decision": "AD",
+            "why": "Dedicated edited commercial before editorial start. Brand confirmed on rewatch via on-screen phone and clinic name."
+          }
+        }
+      ]
+    },
+    {
+      "source": {
+        "url": "https://www.youtube.com/shorts/Ve0zdhTQA4U",
+        "platform": "youtube",
+        "kind": "short",
+        "duration_s": 63.893,
+        "processed_at": "2026-08-28T00:00:00Z"
+      },
+      "segments": [
+        {
+          "id": "seg_01",
+          "start_s": 5.0,
+          "end_s": 63.0,
+          "ad_type": "other",
+          "confidence": 1.0,
+          "brand": "Avis Vascular Center",
+          "description": "Embedded overlay banner for Avis Vascular Center with price and phone, fading in and out over educational speech.",
+          "evidence": {
+            "frame_timestamps": [5.2, 15.0, 30.0, 45.0, 60.0],
+            "transcript_span": "",
+            "signals_used": ["ocr"]
+          },
+          "presentation": "overlay",
+          "annotation": {
+            "human_decision": "AD",
+            "why": "Commercial overlay in downloaded pixels. One event despite fades. Coat logo ignored. Speech is editorial."
+          }
+        }
+      ]
+    },
+    {
+      "source": {
+        "url": "https://www.youtube.com/watch?v=s0LLVQeMmtU",
+        "platform": "youtube",
+        "kind": "live",
+        "duration_s": 662.0,
+        "processed_at": "2026-08-28T00:00:00Z",
+        "processed_window_note": "Live URL offline / bot-checked on 28 Aug 2026. Gold timestamps are relative to a 662s recording of the same channel, processed on the live path (horizon 0). A later break seen on a longer viewing (~15:03) is not in this file and is not labelled."
+      },
+      "segments": [
+        {
+          "id": "seg_01",
+          "start_s": 222.0,
+          "end_s": 252.0,
+          "ad_type": "other",
+          "confidence": 0.9,
+          "brand": "",
+          "description": "Full-screen commercial break during the news live window (~03:42–04:12 of the recording).",
+          "evidence": {
+            "frame_timestamps": [222.0, 235.0, 250.0],
+            "transcript_span": "",
+            "signals_used": ["scene_cut", "ocr"]
+          },
+          "annotation": {
+            "human_decision": "AD",
+            "why": "Timed commercial break, not the persistent network bug."
+          }
+        },
+        {
+          "id": "seg_02",
+          "start_s": 497.0,
+          "end_s": 525.0,
+          "ad_type": "other",
+          "confidence": 0.9,
+          "brand": "",
+          "description": "Full-screen commercial break during the news live window (~08:17–08:45 of the recording).",
+          "evidence": {
+            "frame_timestamps": [497.0, 510.0, 524.0],
+            "transcript_span": "",
+            "signals_used": ["scene_cut", "ocr"]
+          },
+          "annotation": {
+            "human_decision": "AD",
+            "why": "Second discrete break."
+          }
+        }
+      ],
+      "ambiguous_rejected": [
+        {
+          "what": "Persistent on-screen network name / clock / LIVE bug",
+          "resolved_as": "NON_AD",
+          "why": "Channel identity overlay without a discrete offer is not a segment."
+        }
+      ]
+    },
+    {
+      "source": {
+        "url": "https://www.instagram.com/reel/DJl6-v8oufg",
+        "platform": "instagram",
+        "kind": "short",
+        "duration_s": 12.979,
+        "processed_at": "2026-08-28T00:00:00Z"
+      },
+      "segments": [
+        {
+          "id": "seg_01",
+          "start_s": 8.0,
+          "end_s": 10.0,
+          "ad_type": "self_promo",
+          "confidence": 0.85,
+          "brand": "Asian Dental / Dr. Samskruti",
+          "description": "End card with doctor name, hospital address, logo and mobile after a silent brush tutorial.",
+          "evidence": {
+            "frame_timestamps": [8.0, 9.0, 9.8],
+            "transcript_span": "",
+            "signals_used": ["ocr"]
+          },
+          "annotation": {
+            "human_decision": "AD",
+            "why": "Contact + phone + address is a commercial CTA block. Body and coat logo excluded. Not expanded to [0, T]."
+          }
+        }
+      ]
+    },
+    {
+      "source": {
+        "url": "https://www.instagram.com/reel/Db78RoIuOyl/",
+        "platform": "instagram",
+        "kind": "short",
+        "duration_s": 22.567,
+        "processed_at": "2026-08-28T00:00:00Z"
+      },
+      "segments": [],
+      "annotation": {
+        "human_decision": "AMBIGUOUS",
+        "resolved_as": "NON_AD",
+        "why": "Clinic-published comedy about cap prices. No disclosure, no book/call card. Account type is not sufficient."
+      }
+    }
+  ]
+}

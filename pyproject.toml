@@ -1,0 +1,20 @@
+[project]
+name = "ad-segment"
+version = "0.1.0"
+description = "Ad segment detection: URL or file in, JSON timeline out."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "httpx>=0.27.0",
+    "numpy>=2.0.0",
+    "opencv-python-headless>=4.10.0",
+    "pillow>=10.0.0",
+    "pydantic>=2.0.0",
+    "pytesseract>=0.3.13",
+    "pytest>=9.1.1",
+    "python-dotenv>=1.0.0",
+    "python-multipart>=0.0.9",
+    "uvicorn>=0.32.0",
+    "yt-dlp>=2025.1.0",
+]

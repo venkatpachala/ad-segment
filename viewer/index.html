@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Ad segment viewer</title>
+  <style>
+    body { font-family: sans-serif; max-width: 900px; margin: 2rem auto; }
+    video { width: 100%; background: #000; }
+    #bar { position: relative; height: 12px; background: #ddd; margin-top: 8px; }
+    #bar span { position: absolute; top: 0; height: 100%; background: #e23; opacity: 0.7; }
+    pre { background: #111; color: #eee; padding: 1rem; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Ad segments</h1>
+  <p>Paste a local file and JSON from <code>POST /v1/detect</code>. One hour budget: this page is intentionally small.</p>
+  <input id="file" type="file" accept="video/*" />
+  <video id="v" controls></video>
+  <div id="bar"></div>
+  <textarea id="json" rows="12" style="width:100%" placeholder='{"segments":[{"start_s":5,"end_s":63}]}'></textarea>
+  <button id="go">Draw</button>
+  <script>
+    const v = document.getElementById('v');
+    const bar = document.getElementById('bar');
+    document.getElementById('file').onchange = e => {
+      const f = e.target.files[0];
+      if (f) v.src = URL.createObjectURL(f);
+    };
+    document.getElementById('go').onclick = () => {
+      const data = JSON.parse(document.getElementById('json').value);
+      const dur = v.duration || data.source?.duration_s || 1;
+      bar.innerHTML = '';
+      for (const s of (data.segments || [])) {
+        const el = document.createElement('span');
+        el.style.left = (100 * s.start_s / dur) + '%';
+        el.style.width = (100 * (s.end_s - s.start_s) / dur) + '%';
+        el.title = (s.brand || s.ad_type) + ' ' + s.start_s + '-' + s.end_s;
+        bar.appendChild(el);
+      }
+    };
+  </script>
+</body>
+</html>
