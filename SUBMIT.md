@@ -1,46 +1,30 @@
-# Remaining human steps before the email
+# Remaining human steps
 
-Code, labels, DESIGN, EVAL, README, tests, and viewer are in the repo. These you still have to do yourself:
+Already done on this machine:
 
-## 1. Secrets (do this first)
+- Repo is **private**: https://github.com/venkatpachala/ad-segment
+- Collaborator invite sent to **growth-droid** (they must accept)
+- Clean commit `bc001d5` pushed (no `.env`, no `data/cache`, no 240MB Tesseract tree)
+- DESIGN / EVAL / README / ground_truth / API / tests / viewer / fixtures
 
-`.env` was tracked locally. It is now gitignored. **Rotate** `OPENROUTER_API_KEY` and `OPENAI_API_KEY` — they lived in a working tree that should never be pushed.
+You still need:
 
-Do not `git add .env`. Do not push the three old local commits (`b4872f4` … `b79afa5`); they contain multi-GB `data/cache` and `data/runs`.
+## 1. Rotate API keys
 
-## 2. Make the GitHub repo private and add the reviewer
+`.env` was never in the pushed commit, but it sat in the working tree. Rotate OpenRouter and OpenAI keys.
 
-The existing remote `https://github.com/venkatpachala/ad-segment` is **public**. The brief requires a **private** repo.
+## 2. Record the 5-minute walkthrough
 
-GitHub → the repo → Settings → Change repository visibility → Private.
+Follow `RECORDING.md`. Upload unlisted. You cannot submit without this.
 
-Then Settings → Collaborators → Add **growth-droid** (pull is enough).
+## 3. Reply on the assignment thread
 
-If GitHub CLI is installed:
-
-```bash
-gh repo edit venkatpachala/ad-segment --visibility private --accept-visibility-change-consequences
-gh api -X PUT repos/venkatpachala/ad-segment/collaborators/growth-droid -f permission=pull
 ```
+Repo (private, growth-droid invited): https://github.com/venkatpachala/ad-segment
 
-## 3. Push a clean commit, not the bloated history
+Recording: <paste link>
 
-After this machine’s reset-to-`origin/main` + one new commit:
-
-```bash
-git push origin main
+Live note: https://www.youtube.com/watch?v=s0LLVQeMmtU was offline / bot-checked.
+Processed a 662s recording of the same channel on the live path (horizon 0).
+See EVAL.md.
 ```
-
-If `git push` tries to upload 100MB+ mp4s, stop and check `git ls-files "*.mp4"`. Only `data/fixtures/*.mp4` should be listed.
-
-## 4. Record the 5-minute walkthrough
-
-Follow `RECORDING.md`. Upload unlisted (Drive / YouTube). Put the link in the email thread with the repo URL.
-
-## 5. Reply on the thread
-
-Repo: `https://github.com/venkatpachala/ad-segment` (private, growth-droid invited)
-
-Recording: \<your link\>
-
-One line on live: stream `s0LLVQeMmtU` was offline; 662s recording of the same channel, live path, documented in EVAL.md.
