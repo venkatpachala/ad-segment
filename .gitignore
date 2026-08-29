@@ -23,15 +23,20 @@ data/cache/judge/
 # Windows portable Tesseract (240MB). System tesseract or local tree is fine at runtime.
 tesseract/
 
-# Scratch JSON from ad-hoc runs (keep data/eval/ and ground_truth)
-data/*.json
+# Scratch JSON and media from ad-hoc runs (keep data/eval/ and ground_truth)
+*.json
+!ground_truth.json
 !data/ground_truth.json
-!data/eval/
+!data/eval/*.json
+!data/eval/*.jsonl
+data/*.json
 data/*.jsom
+data/*.sjon
 data/*.jsonl
 data/*.jpg
 data/*.mp4
 data/*.mp3
+data/*.ts
 data/v1_frame_*.jpg
 
 # Keep shipped fixtures and frozen eval

@@ -44,7 +44,7 @@ No key → rule judge, `$0`. Never commit `.env`.
 
 ```bash
 python -m pytest tests -q
-# expect 80+ passed
+# expect 88 passed
 
 python -m uvicorn app.main:app --port 8000
 # other terminal:
