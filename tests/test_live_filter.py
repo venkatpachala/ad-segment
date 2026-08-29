@@ -20,7 +20,10 @@ from app.pipeline.roi import (
 from app.pipeline.live_proposers import (
     PersistHistory,
     persist_proposer,
+    persist_signature,
+    roi_spot_proposer,
     LIVE_PERSIST_S,
+    _score_text,
 )
 from app.pipeline.roi import TickRoiResult
 from app.pipeline.ocr import normalize_ocr_text
@@ -205,6 +208,26 @@ def test_text_change_resets_persist():
     for c in cands_at_switch:
         # Should not contain G-Mart text at this point if track expired
         pass  # timing-dependent; just ensure no crash
+
+
+def test_persist_signature_gmart_despite_ticker_junk():
+    assert persist_signature("TEAGUE Nandilath G.Mart FRIDAY asianet") == "gmart"
+    assert persist_signature("Get up to MOST TRUSTED DAIKIN 212500") == "daikin"
+    assert persist_signature("asianet news LIVE 03:16PM") == ""
+    assert persist_signature("moswll en asianetnews.com") == ""
+
+
+def test_roi_spot_emits_daikin_immediately():
+    hist_like = _mock_roi_result("bottom", "Get up to MOST TRUSTED DAIKIN 212500", is_brand=True)
+    cands = roi_spot_proposer([hist_like], now_s=524.0)
+    assert len(cands) == 1
+    assert cands[0].end_s == 524.0
+    assert cands[0].score_hint >= 2
+
+
+def test_score_cashback_is_commercial():
+    score, trig = _score_text("INSTANT CASHBACK 1 FREE COMBO OFFER")
+    assert score >= 2
 
 
 def test_clock_text_not_proposed():

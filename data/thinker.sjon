@@ -1,0 +1,35 @@
+{
+  "source": {
+    "url": "https://youtu.be/ieyzFXJk4e8?si=rUQeyOzjGd2IS2qt",
+    "platform": "youtube",
+    "kind": "vod",
+    "duration_s": 1404.174,
+    "processed_at": "2026-08-27T18:24:37Z"
+  },
+  "segments": [
+    {
+      "id": "seg_01",
+      "start_s": 269.1,
+      "end_s": 352.2,
+      "ad_type": "midroll_sponsor_read",
+      "confidence": 0.98,
+      "brand": "Odoo",
+      "description": "Sponsored segment where the host thanks Odoo for sponsoring and delivers a detailed promotional pitch for Odoo's project management app, ending with a call-to-action to click the link in the description.",
+      "evidence": {
+        "frame_timestamps": [],
+        "transcript_span": "274.6 People managing projects is always difficult.\n276.6 Countless WhatsApp messages, follow up emails from clients, deadlines piling up and one\n281.0 missed task can lead to failure.\n283.3 Ask any project manager and they will tell you that coordination is an absolute chaos.\n288.5 But this is where Odoo's project app can help you out.\n291.2 Odoo is an all-in-one business management software whic",
+        "signals_used": [
+          "intent",
+          "llm"
+        ]
+      },
+      "presentation": null
+    }
+  ],
+  "stats": {
+    "wall_clock_s": 145.55,
+    "estimated_cost_usd": 0.004,
+    "frames_sampled": 0,
+    "model_calls": 2
+  }
+}

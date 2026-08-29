@@ -4,17 +4,118 @@
     "platform": "youtube",
     "kind": "live",
     "duration_s": 662.0,
-    "processed_at": "2026-08-28T20:02:48Z",
+    "processed_at": "2026-08-29T14:04:38Z",
     "language": ""
   },
-  "segments": [],
+  "segments": [
+    {
+      "id": "seg_01",
+      "start_s": 420.0,
+      "end_s": 426.0,
+      "ad_type": "other",
+      "confidence": 0.7000000000000001,
+      "brand": "VIDAY",
+      "description": "Persistent lower-third commercial overlay. OCR: persist_roi, live_overlay.",
+      "evidence": {
+        "frame_timestamps": [
+          420.0,
+          426.0,
+          420.0,
+          426.0
+        ],
+        "transcript_span": "",
+        "ocr_text": "VIDAY",
+        "transcript_lang": "",
+        "signals_used": [
+          "ocr"
+        ]
+      },
+      "presentation": "overlay"
+    },
+    {
+      "id": "seg_02",
+      "start_s": 438.0,
+      "end_s": 444.0,
+      "ad_type": "other",
+      "confidence": 0.7000000000000001,
+      "brand": "Samsung",
+      "description": "Persistent lower-third commercial overlay. OCR: persist_roi, live_overlay.",
+      "evidence": {
+        "frame_timestamps": [
+          438.0,
+          444.0,
+          438.0,
+          444.0
+        ],
+        "transcript_span": "",
+        "ocr_text": "Samsung | samsung.com MZaAMlw2os DYMEBaN AON FRIDAY \u2018asianetnews.com",
+        "transcript_lang": "",
+        "signals_used": [
+          "ocr"
+        ]
+      },
+      "presentation": "overlay"
+    },
+    {
+      "id": "seg_03",
+      "start_s": 522.0,
+      "end_s": 528.0,
+      "ad_type": "other",
+      "confidence": 0.7000000000000001,
+      "brand": "Daikin",
+      "description": "Persistent lower-third commercial overlay. OCR: persist_roi, live_overlay.",
+      "evidence": {
+        "frame_timestamps": [
+          522.0,
+          528.0,
+          522.0,
+          528.0
+        ],
+        "transcript_span": "",
+        "ocr_text": "Daikin | BIEMIECANAUOO Get DAIKIN 212500 WORLD'S LEADING AIR CONDITIONING Cashback COMPANY FROM JAPAN Exchange Your",
+        "transcript_lang": "",
+        "signals_used": [
+          "ocr"
+        ]
+      },
+      "presentation": "overlay"
+    },
+    {
+      "id": "seg_04",
+      "start_s": 562.0,
+      "end_s": 572.0,
+      "ad_type": "other",
+      "confidence": 0.7000000000000001,
+      "brand": "Daikin",
+      "description": "Persistent lower-third commercial overlay. OCR: persist_roi, live_overlay.",
+      "evidence": {
+        "frame_timestamps": [
+          562.0,
+          570.0,
+          562.0,
+          572.0,
+          562.0,
+          572.0,
+          562.0,
+          572.0
+        ],
+        "transcript_span": "",
+        "ocr_text": "Daikin | 77032 23228",
+        "transcript_lang": "",
+        "signals_used": [
+          "ocr"
+        ]
+      },
+      "presentation": "overlay"
+    }
+  ],
   "stats": {
-    "wall_clock_s": 178.87,
+    "wall_clock_s": 314.66,
     "estimated_cost_usd": 0.0,
     "frames_sampled": 1324,
-    "frames_ocrd": 548,
-    "ocr_wall_s": 37.02,
-    "model_calls": 0,
+    "frames_ocrd": 1174,
+    "ocr_wall_s": 139.51,
+    "model_calls": 4,
     "llm_fallback": ""
   }
 }

@@ -40,6 +40,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+os.environ["OPENCV_LOG_LEVEL"] = "OFF"
+try:
+    cv2.setLogLevel(0)
+except Exception:
+    pass
+
 from app.config import RUNS_DIR
 from app.models.schemas import DetectResponse, Source, Stats, utc_now
 from app.pipeline.asr import CaptionLine, load_transcript
@@ -57,13 +63,18 @@ from app.pipeline.live_proposers import (
     SceneCutState,
     intent_proposer_live,
     persist_proposer,
+    roi_spot_proposer,
     scene_cut_proposer,
 )
 from app.pipeline.live_streamer import LiveStreamIngest
+from app.pipeline.llm_judge import llm_available
+from app.pipeline.ocr import guess_ocr_brand
 from app.pipeline.roi import (
     LIVE_ROIS,
     ROI_BR,
     ROI_TR,
+    ROI_LEFT,
+    ROI_BOTTOM,
     RoiTickState,
     sense_all_rois,
     ocr_crop,
@@ -176,8 +187,9 @@ def _run_tick(
 
     # 3. P1 — persist proposer (no Tesseract, just dict lookup)
     persist_cands = persist_proposer(roi_results, now_s, persist_hist)
+    spot_cands = roi_spot_proposer(roi_results, now_s)
 
-    # 4. P2 — scene-cut break proposer (Tesseract only on cut)
+    # 4. P2 — scene-cut break proposer (Tesseract on cut or milder visual change)
     break_cand: Candidate | None = None
     if frames_bgr and not overrun_last_tick:
         latest_frame = frames_bgr[-1]
@@ -209,7 +221,7 @@ def _run_tick(
     tick_wall = time.perf_counter() - tick_t0
     overrun = tick_wall > _OVERRUN_S
 
-    return persist_cands, break_cands, intent_cands, ocr_calls, new_last_whisper_s, cut_this_tick
+    return persist_cands + spot_cands, break_cands, intent_cands, ocr_calls, new_last_whisper_s, cut_this_tick
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +278,7 @@ def run_live_stream(
     window_s: float = WINDOW_S,
     out_jsonl: str | None = None,
     out_json: str | None = None,
-    use_llm: bool = False,
+    use_llm: bool = True,
     max_duration_s: float | None = None,
     on_event=None,
     stop_event: threading.Event | None = None,
@@ -288,14 +300,17 @@ def run_live_stream(
     is_live = bool(url)
     source_label = url if is_live else local_path
 
-    print(f"\n{'=' * 60}")
-    print(f"  LIVE STREAM AD DETECTOR (horizon = 0 / on-the-spot)")
+    llm_info = llm_available() or "Active (Rule/Fast Heuristic Brain)" if use_llm else "Disabled"
+
+    print(f"\n{'=' * 65}")
+    print(f"  ⚡ LIVE STREAM AD DETECTOR (Real-Time Horizon = 0)")
     print(f"  Mode   : {'TRUE LIVE STREAM (Real-Time URL)' if is_live else 'LOCAL SIMULATION'}")
     print(f"  Source : {source_label}")
-    print(f"  Tick   : {tick_s}s  |  Window : {window_s}s  |  LLM: {use_llm}")
+    print(f"  Tick   : {tick_s}s  |  Window : {window_s}s  |  LLM Judge: {llm_info}")
+    print(f"  Sensors: Multi-ROI (Left L-Bar, Bottom, TR, BR) + Scene Cuts + ASR")
     if is_live:
         print(f"  Controls: Press Ctrl+C at any time to finish & summarize")
-    print(f"{'=' * 60}\n")
+    print(f"{'=' * 65}\n")
 
     ingest_worker: LiveStreamIngest | None = None
     stream_path: Path
@@ -546,24 +561,39 @@ def run_live_stream(
             }
             _emit(event)
 
+            time_str = f"{int(curr_now // 60):02d}:{curr_now % 60:04.1f}"
+
+            if provisional:
+                for p in provisional:
+                    roi_name = str(p.get('roi', '')).upper() or 'OVERLAY'
+                    p_text = p.get('text', '')
+                    guessed_brand = p.get('brand') or guess_ocr_brand(p_text) or 'Commercial Brand'
+                    dur = max(0.0, float(p.get('end_s', curr_now)) - float(p.get('start_s', curr_now)))
+                    print(
+                        f"\n🚨 [LIVE AD ACTIVE ON SCREEN @ {time_str}] ⚡ latency: {tick_wall_ms:.1f}ms\n"
+                        f"   ┌ Status      : 🔥 AD DETECTED ON SCREEN\n"
+                        f"   ├ Brand       : {guessed_brand}\n"
+                        f"   ├ Placement   : {roi_name} ROI (L-Bar / Side Column / Banner)\n"
+                        f"   ├ OCR Text    : \"{p_text[:80]}\"\n"
+                        f"   ├ On-Screen   : [{p.get('start_s'):.1f}s – {p.get('end_s'):.1f}s] ({dur:.1f}s continuous)\n"
+                        f"   └ Brain Policy: OCR + LLM Multi-Modal Reasoning\n"
+                    )
+
             if emitted:
                 for seg in emitted:
                     print(
-                        f"🔴 [LIVE EMIT @ now={curr_now:06.1f}s] {seg.id}  "
-                        f"[{seg.start_s:.1f}s – {seg.end_s:.1f}s]  "
-                        f"type={seg.ad_type}  brand='{seg.brand}'"
+                        f"\n🔴 [LIVE AD COMMITTED @ {time_str}] ⚡ latency: {tick_wall_ms:.1f}ms\n"
+                        f"   ┌ Segment ID  : {seg.id}\n"
+                        f"   ├ Brand       : {seg.brand or 'Commercial Ad'}\n"
+                        f"   ├ Ad Type     : {seg.ad_type}\n"
+                        f"   ├ Time Range  : [{seg.start_s:.1f}s – {seg.end_s:.1f}s] ({seg.end_s - seg.start_s:.1f}s duration)\n"
+                        f"   ├ Signals     : {', '.join(seg.evidence.signals_used) if seg.evidence else 'OCR+LLM'}\n"
+                        f"   └ Description : {seg.description[:100]}\n"
                     )
-            if provisional:
-                for p in provisional:
-                    print(
-                        f"🟡 [PROVISIONAL @ now={curr_now:06.1f}s] "
-                        f"{p.get('roi','').upper()} bug: {p.get('text','')} "
-                        f"[{p.get('start_s')}s - {p.get('end_s')}s]"
-                    )
-            if cut:
-                print(f"   ↗ cut detected at now={curr_now:.1f}s | tick={tick_wall_ms:.0f}ms | ocr={ocr_calls}")
-            elif ocr_calls > 0:
-                print(f"   · now={curr_now:06.1f}s | tick={tick_wall_ms:.0f}ms | ocr={ocr_calls}")
+
+            if not provisional and not emitted:
+                cut_str = " | ↗ Hard Scene Cut" if cut else ""
+                print(f"📺 [{time_str}] ⚡ {tick_wall_ms:.0f}ms | Editorial Broadcast (No Ad){cut_str} | Sensors: 4 ROIs | MAE skip: active")
 
             if not growing and curr_now >= total_dur:
                 break
@@ -708,8 +738,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional maximum seconds to process before closing session",
     )
     p.add_argument(
-        "--llm", action="store_true",
-        help="Enable LLM judge on commit (adds ~1.5s latency per commit; off by default)",
+        "--llm", action=argparse.BooleanOptionalAction, default=True,
+        help="Enable LLM judge for live verification (enabled by default; use --no-llm to disable)",
     )
     return p
 

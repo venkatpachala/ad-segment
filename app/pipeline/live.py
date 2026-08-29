@@ -12,6 +12,7 @@ from app.pipeline.intent import candidates_from_intent
 from app.pipeline.candidates import candidates_from_ocr
 from app.pipeline.judge import judge_candidate
 from app.pipeline.llm_judge import judge_with_llm, llm_available
+from app.pipeline.live_proposers import persist_signature
 from app.pipeline.ocr import OcrHit, normalize_ocr_text, ocr_frames
 from app.pipeline.temporal import snap_segments
 from app.pipeline.types import Candidate, SampledFrame
@@ -20,7 +21,7 @@ from app.pipeline.types import Candidate, SampledFrame
 TICK_S: float = 2.0         # Tick frequency
 WINDOW_S: float = 16.0      # Sliding sensory lookback window (16s = ~3 HLS segments of context)
 SILENCE_S: float = 6.0      # Inactivity gap to trigger commit
-MIN_S: float = 3.0          # Minimum duration to confirm commercial span (drops 1-frame flashes)
+MIN_S: float = 2.0          # Two live ticks (2s clock) confirm a short TV spot
 MAX_OPEN_S: float = 180.0   # Maximum open span before forced commit (handles stuck watermarks)
 LIVE_PERSIST_S: float = 8.0 # Same text in same ROI this long → provisional overlay emit
 
@@ -85,27 +86,24 @@ class LiveState:
     _next_id: int = 1
 
     def provisional_overlays(self) -> list[dict]:
-        """Return growing-end_s entries for open tracks that have passed LIVE_PERSIST_S.
-
-        Called once per tick by live_main.py to write provisional jsonl lines.
-        Strategy: emit at first PERSIST_S threshold, then patch end_s each tick.
-        This proves live causal detection — jsonl shows growing end_s over time.
-        """
+        """Return growing-end_s entries for active open commercial tracks immediately."""
         result = []
         for oc in self.open_cands:
             if oc.status == LiveStatus.COMMITTED:
                 continue
-            if oc.duration >= LIVE_PERSIST_S and oc.score_hint >= 1:
+            if oc.score_hint >= 1:
                 oc.already_published = True
-                # Best representative text
                 best_text = max(oc.texts, key=len) if oc.texts else ""
+                from app.pipeline.ocr import guess_ocr_brand
+                brand = guess_ocr_brand(best_text)
                 result.append({
                     "start_s": round(oc.start_s, 2),
                     "end_s": round(min(oc.last_evidence_s, self.now_s), 2),
                     "roi": oc.roi,
                     "text": best_text[:80],
+                    "brand": brand,
                     "source": oc.source,
-                    "status": "provisional",
+                    "status": "active",
                 })
         return result
 
@@ -150,25 +148,36 @@ class LiveState:
         matched_ids = set()
         for c in clipped_cands:
             matched = False
-            roi_hint = "tr" if "tr" in c.source else ("br" if "br" in c.source else "")
-            sig = normalize_ocr_text(max(c.texts, key=len) if c.texts else "")[:40]
+            roi_hint = (
+                "left" if "left" in c.source
+                else ("bottom" if "bottom" in c.source
+                else ("tr" if "tr" in c.source
+                else ("br" if "br" in c.source else "")))
+            )
+            blob = max(c.texts, key=len) if c.texts else ""
+            sig = persist_signature(blob) or normalize_ocr_text(blob)[:40]
             persist = "persist" in c.source
             for oc in self.open_cands:
                 if oc.status == LiveStatus.COMMITTED:
                     continue
                 oc_persist = "persist" in oc.source
-                if persist != oc_persist:
-                    continue  # never glue L-bar persist with a scene-cut break
-                same_roi_sig = bool(
-                    roi_hint and oc.roi == roi_hint and sig and oc.text_sig and (
+                same_sig = bool(
+                    sig and oc.text_sig and (
                         sig == oc.text_sig or sig in oc.text_sig or oc.text_sig in sig
                     )
+                )
+                # Same brand (G-Mart on L-bar vs full-frame) glues even across sources.
+                # Otherwise never glue persist overlay with an unrelated break.
+                if persist != oc_persist and not same_sig:
+                    continue
+                same_roi_sig = bool(
+                    roi_hint and oc.roi == roi_hint and same_sig
                 )
                 overlap = (
                     c.start_s <= (oc.last_evidence_s + SILENCE_S)
                     and c.end_s >= (oc.start_s - SILENCE_S)
                 )
-                if same_roi_sig or (overlap and not persist):
+                if same_roi_sig or same_sig or (overlap and not persist and not oc_persist):
                     oc.start_s = min(oc.start_s, c.start_s)
                     oc.last_evidence_s = max(oc.last_evidence_s, min(c.end_s, now_s))
                     oc.frame_timestamps.extend(c.frame_timestamps)

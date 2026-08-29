@@ -72,38 +72,74 @@
       "segments": [
         {
           "id": "seg_01",
-          "start_s": 222.0,
-          "end_s": 252.0,
+          "start_s": 420.0,
+          "end_s": 426.0,
           "ad_type": "other",
           "confidence": 0.9,
-          "brand": "",
-          "description": "Full-screen commercial break during the news live window (~03:42–04:12 of the recording).",
+          "brand": "VIDA",
+          "description": "Full-screen Hero VIDA scooter commercial during the news window.",
           "evidence": {
-            "frame_timestamps": [222.0, 235.0, 250.0],
+            "frame_timestamps": [420.0, 424.0, 426.0],
             "transcript_span": "",
-            "signals_used": ["scene_cut", "ocr"]
+            "signals_used": ["ocr", "scene_cut"]
           },
           "annotation": {
             "human_decision": "AD",
-            "why": "Timed commercial break, not the persistent network bug."
+            "why": "On-screen VIDA / Hero scooter spot. Earlier 222–252 label was news (LIVE clock + ticker), not a break."
           }
         },
         {
           "id": "seg_02",
-          "start_s": 497.0,
-          "end_s": 525.0,
+          "start_s": 438.0,
+          "end_s": 444.0,
           "ad_type": "other",
           "confidence": 0.9,
-          "brand": "",
-          "description": "Full-screen commercial break during the news live window (~08:17–08:45 of the recording).",
+          "brand": "Samsung",
+          "description": "Samsung Galaxy buy-now commercial (samsung.com).",
           "evidence": {
-            "frame_timestamps": [497.0, 510.0, 524.0],
+            "frame_timestamps": [438.0, 440.0, 444.0],
             "transcript_span": "",
-            "signals_used": ["scene_cut", "ocr"]
+            "signals_used": ["ocr", "scene_cut"]
           },
           "annotation": {
             "human_decision": "AD",
-            "why": "Second discrete break."
+            "why": "Buy now + samsung.com on a full-screen spot."
+          }
+        },
+        {
+          "id": "seg_03",
+          "start_s": 522.0,
+          "end_s": 528.0,
+          "ad_type": "other",
+          "confidence": 0.9,
+          "brand": "Daikin",
+          "description": "Daikin air-conditioning cashback commercial.",
+          "evidence": {
+            "frame_timestamps": [522.0, 524.0, 528.0],
+            "transcript_span": "",
+            "signals_used": ["ocr"]
+          },
+          "annotation": {
+            "human_decision": "AD",
+            "why": "MOST TRUSTED DAIKIN / cashback on screen."
+          }
+        },
+        {
+          "id": "seg_04",
+          "start_s": 562.0,
+          "end_s": 572.0,
+          "ad_type": "other",
+          "confidence": 0.9,
+          "brand": "Daikin",
+          "description": "Second Daikin / G-Mart air-conditioning overlay.",
+          "evidence": {
+            "frame_timestamps": [562.0, 566.0, 572.0],
+            "transcript_span": "",
+            "signals_used": ["ocr"]
+          },
+          "annotation": {
+            "human_decision": "AD",
+            "why": "Daikin + Nandilath G-Mart on the L-bar / bottom banner."
           }
         }
       ],

@@ -48,43 +48,85 @@ class LiveStreamIngest:
             except OSError:
                 pass
 
-        cmd = [
-            _ytdlp_exe(),
-            "--no-playlist",
-            # HLS live rungs first; mp4 mux often never grows on 24/7 news.
-            "-f",
-            "91/92/93/94/95/96/best[height<=720]/best",
-            "--hls-use-mpegts",
-            "--no-part",
-            "--retries",
-            "infinite",
-            "--fragment-retries",
-            "infinite",
-            "--extractor-args",
-            "youtube:player_client=android,web",
-            "-o",
-            str(self.buffer_path),
-        ]
-        cookie_args = _cookie_args("youtube")
-        if cookie_args:
-            cmd[1:1] = cookie_args  # insert after exe
-            print(f"INFO: live ingest cookies={' '.join(cookie_args)}")
-        else:
-            print("WARN: no YouTube cookies — live HLS often stalls (bot check).")
-        cmd.append(self.url)
-
-        print(f"INFO: starting live ingest {self.url} -> {self.buffer_path.name}")
-        print(f"INFO: yt-dlp {' '.join(cmd[1:-1])} …")
         creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-        self.process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=creationflags,
-        )
+
+        # 1. Attempt direct live HLS stream extraction via android/web client
+        hls_url = None
+        try:
+            cmd_url = [
+                _ytdlp_exe(),
+                "--no-playlist",
+                "--extractor-args",
+                "youtube:player_client=android,web",
+                "-g",
+                self.url,
+            ]
+            cookie_args = _cookie_args("youtube")
+            if cookie_args:
+                cmd_url = [_ytdlp_exe()] + cookie_args + ["--no-playlist", "--extractor-args", "youtube:player_client=android,web", "-g", self.url]
+            res = subprocess.run(cmd_url, capture_output=True, text=True, timeout=12)
+            if res.returncode == 0 and res.stdout.strip():
+                lines = [l.strip() for l in res.stdout.strip().split("\n") if l.strip()]
+                hls_url = lines[0]
+        except Exception:
+            hls_url = None
+
+        if hls_url and ("googlevideo.com" in hls_url or "m3u8" in hls_url or "http" in hls_url):
+            print(f"INFO: [LIVE STREAM INGEST] Connected to real-time live broadcast -> {self.buffer_path.name}")
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-i",
+                hls_url,
+                "-c",
+                "copy",
+                "-f",
+                "mpegts",
+                str(self.buffer_path),
+            ]
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=creationflags,
+            )
+        else:
+            print(f"INFO: starting live stream ingest worker for {self.url} -> {self.buffer_path.name}")
+            cmd = [
+                _ytdlp_exe(),
+                "--no-playlist",
+                "-f",
+                "91/92/93/94/95/96/best[height<=720]/bestvideo[height<=720]+bestaudio/best",
+                "--no-part",
+                "--hls-use-mpegts",
+                "--retries",
+                "infinite",
+                "--fragment-retries",
+                "infinite",
+                "--extractor-args",
+                "youtube:player_client=android,web",
+                "-o",
+                str(self.buffer_path),
+            ]
+            cookie_args = _cookie_args("youtube")
+            if cookie_args:
+                cmd[1:1] = cookie_args
+            cmd.append(self.url)
+
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=creationflags,
+            )
+
+
         self._started_at = time.time()
         self._last_growth_wall = self._started_at
         self._drain_thread = threading.Thread(

@@ -56,9 +56,11 @@ class Roi(NamedTuple):
     y2: float  # bottom edge (0–1)
 
 
-ROI_TR = Roi("tr", 0.72, 0.00, 1.00, 0.22)   # top-right   28 % × 22 %
-ROI_BR = Roi("br", 0.72, 0.78, 1.00, 1.00)   # bottom-right 28 % × 22 %
-LIVE_ROIS: list[Roi] = [ROI_TR, ROI_BR]
+ROI_LEFT = Roi("left", 0.00, 0.00, 0.38, 1.00)     # left L-bar column (MS Dhoni, L-bar ads)
+ROI_BOTTOM = Roi("bottom", 0.00, 0.75, 1.00, 1.00)  # bottom ticker / banner
+ROI_TR = Roi("tr", 0.70, 0.00, 1.00, 0.25)          # top-right   30 % × 25 %
+ROI_BR = Roi("br", 0.70, 0.75, 1.00, 1.00)          # bottom-right 30 % × 25 %
+LIVE_ROIS: list[Roi] = [ROI_LEFT, ROI_TR, ROI_BR, ROI_BOTTOM]
 
 # ---------------------------------------------------------------------------
 # Chrome / channel-watermark token set  (configurable per tenant later)
@@ -67,9 +69,17 @@ LIVE_ROIS: list[Roi] = [ROI_TR, ROI_BR]
 CHANNEL_TOKENS: frozenset[str] = frozenset(
     {
         "asianet",
+        "asianetnews",
+        "asianetnews.com",
         "news",
         "live",
         "friday",
+        "saturday",
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
         "subscribe",
         "watch",
         "stream",
@@ -80,6 +90,27 @@ CHANNEL_TOKENS: frozenset[str] = frozenset(
         "reporter",
         "newshour",
         "special",
+        "overs",
+        "runs",
+        "wickets",
+        "cricket",
+        "aug",
+        "august",
+        "sep",
+        "september",
+        "oct",
+        "october",
+        "nov",
+        "november",
+        "dec",
+        "december",
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "may",
+        "jun",
+        "jul",
     }
 )
 
@@ -197,20 +228,31 @@ def ocr_crop(crop_bgr: np.ndarray) -> str:
 # is_channel_chrome and is_brand_candidate below use the import directly.
 
 
-def is_channel_chrome(text: str) -> bool:
-    """True if the normalized text is channel watermark / ticker chrome.
+def strip_channel_chrome(text: str) -> str:
+    """Remove channel watermarks, clocks, and broadcast tickers from text."""
+    if not text:
+        return ""
+    cleaned = text
+    # Clock / date / time with OCR typos: LIVE|07:10PM, LIVE|O7:10PM, LIV E]07-10PM, 07:10 PM, AUG 29 2026, SATURDAY
+    cleaned = re.sub(r"(?i)\b(?:LIVE\s*[|\]:\s-]*)?[O0-9]{1,2}[:\-.\s][O0-9]{2}(?:\s*[AP]M)?\b", " ", cleaned)
+    cleaned = re.sub(r"(?i)\b(?:LIVE|SATURDAY|FRIDAY|SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY)\b", " ", cleaned)
+    cleaned = re.sub(r"(?i)\b(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+[O0-9]{1,2}\s+[O0-9]{4}\b", " ", cleaned)
+    # Channel logos and websites
+    cleaned = re.sub(r"(?i)\b(?:asianetnews\.com|asianetnews|asianet\s+news|asianet|newshour|eraser)\b", " ", cleaned)
+    return " ".join(cleaned.split())
 
-    A text is chrome when it consists *entirely* of channel tokens — i.e. it
-    adds no commercial brand signal beyond the channel's own identity.
-    """
-    norm = normalize_ocr_text(text)
+
+def is_channel_chrome(text: str) -> bool:
+    """True if after stripping channel chrome, nothing meaningful remains."""
+    stripped = strip_channel_chrome(text)
+    norm = normalize_ocr_text(stripped)
     if not norm or len(norm) < MIN_TEXT_LEN:
-        return True  # empty or too short → treat as chrome
+        return True
     if _CLOCK_RE.match(norm):
-        return True  # pure clock / timestamp
-    tokens = set(norm.split())
-    # Chrome: every meaningful token is in the stop-list
-    meaningful = {t for t in tokens if len(t) >= 3}
+        return True
+    cleaned = re.sub(r"[^\w\s]", " ", norm)
+    tokens = {t for t in cleaned.split() if not t.isdigit()}
+    meaningful = {t for t in tokens if len(t) >= 2}
     if not meaningful:
         return True
     return meaningful.issubset(CHANNEL_TOKENS)
@@ -221,25 +263,14 @@ _LATIN_RE = re.compile(r"[A-Za-z]{3,}")
 
 
 def is_brand_candidate(text: str) -> bool:
-    """True if the text looks like a commercial brand mark in an L-bar corner.
-
-    Criteria (all must hold):
-    - Normalized length ≥ MIN_TEXT_LEN chars
-    - Not channel chrome
-    - Contains at least one Latin token of length ≥ 4 (G-Mart, BHIM; drop 'nim am')
-    - Not pure clock / time
-    """
-    norm = normalize_ocr_text(text)
+    """True if text contains non-chrome Latin commercial content."""
+    stripped = strip_channel_chrome(text)
+    if not _LATIN_RE.search(stripped):
+        return False
+    norm = normalize_ocr_text(stripped)
     if len(norm) < MIN_TEXT_LEN:
         return False
-    if is_channel_chrome(text):
-        return False
-    letters = re.findall(r"[A-Za-z]{3,}", norm)
-    if not letters:
-        return False
-    if max(len(t) for t in letters) < 4:
-        return False
-    return True
+    return not is_channel_chrome(text)
 
 
 # ---------------------------------------------------------------------------

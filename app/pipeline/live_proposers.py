@@ -32,6 +32,7 @@ from app.pipeline.roi import (
     is_channel_chrome,
     normalize_ocr_text,
     ocr_crop,
+    strip_channel_chrome,
 )
 from app.pipeline.types import Candidate
 
@@ -42,13 +43,31 @@ if TYPE_CHECKING:
 # Constants
 # ---------------------------------------------------------------------------
 
-LIVE_PERSIST_S: float = 8.0     # same text in same ROI this long → overlay
-SCENE_CUT_THRESHOLD: float = 0.35  # Bhattacharyya distance threshold for cut
+LIVE_PERSIST_S: float = 8.0     # same brand in same ROI this long → overlay
+SCENE_CUT_THRESHOLD: float = 0.35  # Bhattacharyya: treat as a hard cut
+SCENE_OCR_THRESHOLD: float = 0.28  # milder change: still full-frame OCR (Samsung/Daikin)
 HIST_SIZE = [8, 8, 8]
 HIST_RANGES = [0, 256, 0, 256, 0, 256]
 
 # OCR score threshold for break detection (mirrors ocr.py OCR_SCORE_THRESHOLD)
 BREAK_OCR_SCORE_MIN: int = 2
+
+_SKIP_SIG_TOKENS: frozenset[str] = frozenset(
+    {
+        "asianet", "news", "live", "friday", "saturday", "sunday", "monday",
+        "tuesday", "wednesday", "thursday", "overs", "runs", "wickets",
+        "kerala", "cricket", "league", "cable", "august", "breaking",
+        "update", "reporter", "channel", "stream", "watch", "subscribe",
+        "the", "and", "for", "get", "now", "most", "from", "any", "app",
+        "years", "combo", "free", "buy", "with", "hero", "world", "order",
+        "digital", "expert", "powered", "available",
+    }
+)
+_STRONG_BRAND = re.compile(
+    r"nandilath|\bg[.\s-]?mart\b|\bdaikin\b|\bsamsung\b|\bgalaxy\b|"
+    r"chicking|\bjewellers?\b|\bvida\b",
+    re.I,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -77,8 +96,8 @@ class PersistHistory:
         # roi_name → text_sig that was active last tick (for expiry)
         self._last_active: dict[str, str | None] = {}
 
-    def _make_sig(self, norm_text: str) -> str:
-        return norm_text[:40].strip()
+    def _make_sig(self, raw_or_norm: str) -> str:
+        return persist_signature(raw_or_norm)
 
     def update(self, roi_result: TickRoiResult, now_s: float) -> None:
         """Record one ROI observation for this tick."""
@@ -88,8 +107,7 @@ class PersistHistory:
             self._last_active[roi] = None
             return
 
-        norm = roi_result.norm_text
-        sig = self._make_sig(norm)
+        sig = self._make_sig(roi_result.raw_text or roi_result.norm_text)
         if not sig:
             self._last_active[roi] = None
             return
@@ -119,20 +137,18 @@ class PersistHistory:
             del self._tracks[k]
 
     def active_candidates(self, now_s: float) -> list[Candidate]:
-        """Return Candidate list for all tracks that have persisted ≥ LIVE_PERSIST_S."""
+        """Return overlay candidates that have persisted ≥ LIVE_PERSIST_S."""
         cands: list[Candidate] = []
         for (roi, sig), track in self._tracks.items():
-            duration = track.last_seen_s - track.first_seen_s
-            if duration < LIVE_PERSIST_S:
+            if now_s - track.first_seen_s < LIVE_PERSIST_S:
                 continue
-            # Build a representative text from raw samples
             best_text = _best_raw(track.sample_texts) or sig
             cands.append(
                 Candidate(
                     start_s=track.first_seen_s,
                     end_s=min(track.last_seen_s, now_s),  # never exceed horizon
                     source=f"ocr_persist_{roi}",
-                    raw_triggers=["persist_roi"],
+                    raw_triggers=["persist_roi", "live_overlay"],
                     texts=[best_text],
                     frame_timestamps=[track.first_seen_s, min(track.last_seen_s, now_s)],
                     score_hint=3,  # crosses judge_candidate score_hint >= 2 gate
@@ -146,6 +162,33 @@ def _best_raw(texts: list[str]) -> str:
     if not texts:
         return ""
     return max(texts, key=len)
+
+
+def persist_signature(text: str) -> str:
+    """Stable brand key from noisy live OCR (ticker junk around G-Mart / Daikin)."""
+    if not text:
+        return ""
+    stripped = strip_channel_chrome(text)
+    if _STRONG_BRAND.search(stripped):
+        if re.search(r"nandilath|\bg[.\s-]?mart\b", stripped, re.I):
+            return "gmart"
+        if re.search(r"\bdaikin\b", stripped, re.I):
+            return "daikin"
+        if re.search(r"\bsamsung\b|\bgalaxy\b", stripped, re.I):
+            return "samsung"
+        if re.search(r"chicking", stripped, re.I):
+            return "chicking"
+        if re.search(r"\bvida\b", stripped, re.I):
+            return "vida"
+        if re.search(r"jeweller", stripped, re.I):
+            return "jewellers"
+    m = re.search(r"\b([a-z0-9][a-z0-9\-]{2,}\.(?:com|in))\b", stripped, re.I)
+    if m:
+        host = m.group(1).lower()
+        if "asianet" not in host and "news" not in host:
+            return host
+    # Do not key persist on a random 5-letter OCR token (ticker junk like "moswll").
+    return ""
 
 
 def persist_proposer(
@@ -204,6 +247,9 @@ def _score_text(text: str) -> tuple[int, list[str]]:
         score += 2; triggers.append("sponsor")
     if _BRANDISH.search(text):
         score += 2; triggers.append("brand_word")
+    if _STRONG_BRAND.search(text) and score < 2:
+        score = 2
+        triggers.append("brand_word")
     return score, triggers
 
 
@@ -231,11 +277,17 @@ def scene_cut_proposer(
 
     if state.prev_hist is not None:
         dist = float(cv2.compareHist(state.prev_hist, hist, cv2.HISTCMP_BHATTACHARYYA))
-        if dist >= SCENE_CUT_THRESHOLD:
-            cut_detected = True
-            # Full-frame OCR once
+        cut_detected = dist >= SCENE_CUT_THRESHOLD
+        # OCR on a hard cut OR a milder visual change (static-looking TV spots
+        # sit just under 0.35 and were previously skipped entirely).
+        if dist >= SCENE_OCR_THRESHOLD:
             text = ocr_crop(frame_bgr)
             score, triggers = _score_text(text)
+            from app.pipeline.ocr import guess_ocr_brand
+            brand = guess_ocr_brand(text)
+            if brand and score < 2 and persist_signature(text):
+                score = 2
+                triggers.append(f"brand:{brand}")
             if score >= BREAK_OCR_SCORE_MIN:
                 cand = Candidate(
                     start_s=now_s,
@@ -251,6 +303,36 @@ def scene_cut_proposer(
 
     state.prev_hist = hist
     return None, cut_detected
+
+
+def roi_spot_proposer(roi_results: list[TickRoiResult], now_s: float) -> list[Candidate]:
+    """Short commercial spots visible in a live ROI this tick (Daikin / Samsung).
+
+    Does not wait for LIVE_PERSIST_S — a 4s TV spot is still an ad.
+    """
+    cands: list[Candidate] = []
+    for r in roi_results:
+        if r.is_chrome or not r.raw_text:
+            continue
+        score, triggers = _score_text(r.raw_text)
+        sig = persist_signature(r.raw_text)
+        if score < BREAK_OCR_SCORE_MIN:
+            if not _STRONG_BRAND.search(r.raw_text or ""):
+                continue
+            score = 2
+            triggers.append("brand_word")
+        cands.append(
+            Candidate(
+                start_s=now_s,
+                end_s=now_s,
+                source=f"ocr_break_{r.roi_name}",
+                raw_triggers=triggers or ["brand_word"],
+                texts=[r.raw_text],
+                frame_timestamps=[now_s],
+                score_hint=score,
+            )
+        )
+    return cands
 
 
 # ---------------------------------------------------------------------------

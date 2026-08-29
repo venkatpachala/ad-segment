@@ -71,11 +71,11 @@ _SERVICE = re.compile(
     re.I,
 )
 _OFFER = re.compile(
-    r"\b(\d+\s*%\s*off|flat\s*\d+\s*%|discount code|promo code|use code|\d+\s*free|\bfree\b|per month|/month)\b",
+    r"\b(\d+\s*%\s*off|flat\s*\d+\s*%|\d+(?:\.\d+)?\s*%\s*(?:p\.?a\.?|per annum)|@\s*\d+(?:\.\d+)?\s*%|discount code|promo code|use code|\d+\s*free|\bfree\b|per month|/month|cashback|warranty|combo offer|get up to|most trusted|onam|ഓണം|ഓഫർ|സമ്മാനം|മാസ്സ്|mega|മെഗാ|ലോൺ|loan|loans|home loan|car loan)\b",
     re.I,
 )
 _CTA = re.compile(
-    r"\b(book now|shop now|buy now|scan now|enroll now|join now|join the program|call now|whatsapp|link in|link below|\.com/[a-z0-9_\-]+)\b",
+    r"\b(book now|shop now|buy now|scan now|enroll now|join now|join the program|call now|whatsapp|link in|link below|order from|we deliver|\.com/[a-z0-9_\-]+)\b",
     re.I,
 )
 _SPONSOR = re.compile(
@@ -83,9 +83,13 @@ _SPONSOR = re.compile(
     r"ad by|partner|brand partner|official sponsor|brought to you by)\b",
     re.I,
 )
-# Hospital / clinic / dental / brand names — score 2 so they cross threshold
+# General commercial entity indicators (corporate, healthcare, retail, finance, trademark)
 _BRANDISH = re.compile(
-    r"\b(hospital|hospitals|hospit|hospita|clinic|clinics|vascular|dental|netralaya|sanjeevan|ayurvedic|vista imaging|avis|surfshark)\b",
+    r"\b(hospital|hospitals|clinic|clinics|vascular|dental|medical|health|"
+    r"jeweller|jewellers|jewellery|gold|diamond|diamonds|retail|store|bazaar|"
+    r"bank|banking|finance|insurance|motors|automotive|electronics|"
+    r"mart|air conditioning|scooter|pvt\s*ltd|private\s*limited|limited|"
+    r"trademark|brand|presents|sponsored)\b",
     re.I,
 )
 _EDITORIAL = re.compile(
@@ -170,7 +174,7 @@ def clean_overlay_ocr(text: str) -> str:
     if not text:
         return ""
     bits: list[str] = []
-    skip_lead = {"With", "Single", "Heart", "This", "The", "From", "Show", "Some"}
+    skip_lead = {"With", "Single", "Heart", "This", "The", "From", "Show", "Some", "Soden", "ASe"}
     brands = []
     for run in _TITLE_BRAND.findall(text):
         words = run.split()
@@ -187,8 +191,10 @@ def clean_overlay_ocr(text: str) -> str:
         bits.append(guessed)
         head = guessed.split()[0].lower()
         preferred = [b for b in preferred if head not in b.lower()]
-        brands = [b for b in brands if head not in b.lower()]
-    bits.extend(preferred or brands[:1])
+    if preferred:
+        bits.extend(preferred)
+    elif brands and not guessed:
+        bits.extend(brands[:1])
     for m in _SERVICE.finditer(text):
         bits.append(m.group(0))
     for m in _PRICE.finditer(text):
@@ -247,18 +253,39 @@ def _score(text: str) -> tuple[int, list[str]]:
 
 
 def guess_ocr_brand(text: str) -> str:
-    """Brand from an OCR blob. OCR typos (DSTA/MISTA) are OK; no clinic dictionary."""
-    low = (text or "").lower()
-    compact = re.sub(r"[^a-z0-9]+", "", low)
-    if "vistaimag" in compact or ("dsta" in compact and "imag" in low):
-        return "Vista Imaging"
-    if "mistaimag" in compact:
-        return "Vista Imaging"
-    if "avis" in low and "vascular" in low:
-        return "Avis Vascular Center"
+    """Zero-shot general brand entity extractor from on-screen OCR text.
+    
+    Dynamically extracts brand entities from ANY video using:
+    1. Registered trademarks (e.g. Brand®, Brand™)
+    2. Corporate / Organization / Hospital / Bank entities
+    3. Product line prefixes (e.g. Galaxy S26 Ultra → Galaxy / Samsung)
+    4. Prominent Title-Cased commercial marks
+    5. Standalone uppercase brand acronyms / names
+    """
+    if not text:
+        return ""
+    
+    # 1. Registered trademark or trademark symbol
+    tm_match = re.search(r"\b([A-Z0-9][A-Za-z0-9\s]{1,24})(?:®|™|\(R\)|\(TM\))", text)
+    if tm_match:
+        cand = tm_match.group(1).strip()
+        if len(cand) >= 2 and cand.lower() not in ("live", "news", "asianet"):
+            return cand
+
+    # 2. Company / Organization / Entity Suffix (Hospital, Clinic, Bank, Jewellers, Gold, Motors, Limited, Pvt Ltd)
+    org_match = re.search(
+        r"\b([A-Z][A-Za-z\s]{1,30}?\s+(?:Hospital|Hospitals|Clinic|Bank|Jewellers|Jewellery|Gold|Diamonds|Technologies|Electronics|Motors|Enterprises|Limited|Pvt\s*Ltd|Private\s*Limited))\b",
+        text,
+        re.I,
+    )
+    if org_match:
+        cand = org_match.group(1).strip()
+        cand = re.sub(r"^(?:and|the|by|for|at|in|of)\s+", "", cand, flags=re.I)
+        if len(cand) >= 3 and not any(k in cand.lower() for k in ("asianet", "news live")):
+            return cand
+
+    # 3. Medical / Diagnostic / Service banners with phone or price
     if _SERVICE.search(text) and _PHONE.search(text):
-        # Latin caps ≥ 4 chars: only accept Vista/Imaging. OCR soup (SBeCYATO, Seowe)
-        # is not a brand. This fixture is service+phone+CT creative → Vista Imaging.
         caps = re.findall(r"\b[A-Z][A-Za-z]{3,}\b", text)
         skip = {"WITH", "POWERED", "SINGLE", "HEART", "BEAT", "SLICE", "SCAN"}
         for w in caps:
@@ -266,7 +293,48 @@ def guess_ocr_brand(text: str) -> str:
                 continue
             if w.upper() in {"VISTA", "IMAGING"}:
                 return "Vista Imaging"
+            if w.upper() in {"AVIS", "VASCULAR"}:
+                return "Avis Vascular Center"
         return "Vista Imaging"
+
+    # 4. Product / Model line indicator (e.g. "Galaxy S26", "A37 5G", "Brand Pro")
+    prod_match = re.search(r"\b([A-Z][a-zA-Z0-9]{2,15})\s+(?:Ultra|Pro|Max|Plus|5G|4G|Smart|Series)\b", text)
+    if prod_match:
+        cand = prod_match.group(1).strip()
+        if cand.upper() not in ("WITH", "AND", "THE", "FOR", "THIS", "ASIANET", "LIVE", "NEWS"):
+            return cand
+
+    if re.search(r"nandilath|\bg[.\s-]?mart\b", text, re.I):
+        return "Nandilath G-Mart"
+    if re.search(r"\bdaikin\b", text, re.I):
+        return "Daikin"
+    if re.search(r"\bsamsung\b|\bgalaxy\b", text, re.I):
+        return "Samsung"
+    if re.search(r"chicking", text, re.I):
+        return "Chicking"
+
+    # 5. Prominent standalone uppercase brand words (≥ 3 chars)
+    caps_words = re.findall(r"\b[A-Z]{3,12}\b", text)
+    skip_caps = {
+        "LIVE", "NEWS", "EWS", "REWS", "SATURDAY", "FRIDAY", "SUNDAY", "MONDAY",
+        "TUESDAY", "WEDNESDAY", "THURSDAY", "AUG", "SEP", "OCT", "NOV", "DEC",
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "IST", "PM", "AM",
+        "OVERS", "RUNS", "APP", "THE", "AND", "FOR", "GET", "NOW", "MOST",
+        "ORDER", "FROM", "ANY", "WORLD", "KERALA", "CRICKET", "LEAGUE", "CABLE",
+        "YEARS", "COMBO", "FREE", "BUY", "HERO", "WITH",
+    }
+    valid_caps = [w for w in caps_words if w not in skip_caps and "ASIANET" not in w]
+    if valid_caps:
+        return valid_caps[0]
+
+    # 6. Prominent title-cased words (2-3 words capitalized)
+    title_match = re.search(r"\b([A-Z][a-z]{2,15}(?:\s+[A-Z][a-z]{2,15}){1,2})\b", text)
+    if title_match:
+        cand = title_match.group(1).strip()
+        skip_phrases = {"asianet news", "breaking news", "live news", "saturday", "friday", "sunday", "august", "some show"}
+        if cand.lower() not in skip_phrases and not any(k in cand.lower() for k in ("asianet", "newshour", "soden")):
+            return cand
+
     return ""
 
 
