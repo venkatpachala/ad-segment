@@ -1,8 +1,9 @@
-"""Live stream ingest worker for real-time YouTube Live / HLS / DASH streams.
+"""Live stream ingest worker for real-time YouTube Live / HLS streams.
 
-Spawns a background process (yt-dlp / ffmpeg) that continuously writes
-incoming video segments to an appendable MPEG-TS (.ts) ring buffer.
-The live tick loop reads from this buffer in real time — never cache-then-VOD.
+Spawns yt-dlp that appends MPEG-TS into a growing buffer. The tick loop
+reads only duration actually on disk — never cache-then-VOD.
+
+If YouTube bot-checks, stderr is printed so the CLI is not a silent stall.
 """
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ from app.pipeline.ingest import (
 
 
 class LiveStreamIngest:
-    """Manages background streaming of a live URL into a growing .ts buffer."""
+    """Background streaming of a live URL into a growing .ts buffer."""
 
     def __init__(self, url: str, buffer_path: Path) -> None:
         self.url = url
@@ -40,7 +41,6 @@ class LiveStreamIngest:
         self._drain_thread: threading.Thread | None = None
 
     def start(self) -> None:
-        """Start the background live stream download process."""
         self.buffer_path.parent.mkdir(parents=True, exist_ok=True)
         if self.buffer_path.exists():
             try:
@@ -51,22 +51,30 @@ class LiveStreamIngest:
         cmd = [
             _ytdlp_exe(),
             "--no-playlist",
+            # HLS live rungs first; mp4 mux often never grows on 24/7 news.
             "-f",
-            "best[height<=720]/bestvideo[height<=720]+bestaudio/best",
+            "91/92/93/94/95/96/best[height<=720]/best",
+            "--hls-use-mpegts",
             "--no-part",
             "--retries",
             "infinite",
             "--fragment-retries",
             "infinite",
+            "--extractor-args",
+            "youtube:player_client=android,web",
             "-o",
             str(self.buffer_path),
         ]
-        cookie_args = _cookie_args()
+        cookie_args = _cookie_args("youtube")
         if cookie_args:
-            cmd.extend(cookie_args)
+            cmd[1:1] = cookie_args  # insert after exe
+            print(f"INFO: live ingest cookies={' '.join(cookie_args)}")
+        else:
+            print("WARN: no YouTube cookies — live HLS often stalls (bot check).")
         cmd.append(self.url)
 
-        print(f"INFO: starting live stream ingest worker for {self.url} -> {self.buffer_path.name}")
+        print(f"INFO: starting live ingest {self.url} -> {self.buffer_path.name}")
+        print(f"INFO: yt-dlp {' '.join(cmd[1:-1])} …")
         creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         self.process = subprocess.Popen(
             cmd,
@@ -93,17 +101,40 @@ class LiveStreamIngest:
                 self._stderr.append(line)
                 if len(self._stderr) > 400:
                     self._stderr = self._stderr[-200:]
+                low = line.lower()
+                if any(
+                    k in low
+                    for k in (
+                        "error",
+                        "sign in",
+                        "not a bot",
+                        "429",
+                        "unavailable",
+                        "warning",
+                    )
+                ):
+                    print(f"INGEST: {line.rstrip()}")
         except Exception:
             pass
 
+    def buffer_size(self) -> int:
+        try:
+            return self.buffer_path.stat().st_size if self.buffer_path.exists() else 0
+        except OSError:
+            return 0
+
+    def last_log(self, n: int = 8) -> str:
+        lines = [ln.rstrip() for ln in self._stderr[-n:] if ln.strip()]
+        return "\n".join(lines)
+
     def get_available_duration_s(self) -> float:
-        """Probe the current duration of the growing stream buffer. Never future."""
         now = time.time()
         if now - self._last_probe_time < 0.8 and self._last_duration_s > 0:
             self._note_growth()
             return self._last_duration_s
 
         if not self.buffer_path.exists() or self.buffer_path.stat().st_size < 50_000:
+            self._note_growth()
             return 0.0
 
         self._note_growth()
@@ -125,20 +156,17 @@ class LiveStreamIngest:
             self._last_growth_wall = time.time()
 
     def is_active(self) -> bool:
-        """True if the ingest process is running and not terminated."""
         if self.process is None:
             return False
         return self.process.poll() is None
 
     def stalled(self, stall_s: float = HLS_STALL_S) -> bool:
-        """True when the buffer has not grown for stall_s seconds."""
         if self._started_at <= 0:
             return False
         self._note_growth()
         return (time.time() - self._last_growth_wall) >= stall_s
 
     def ingest_error(self) -> IngestError | None:
-        """If the worker died before producing media, map stderr to IngestError."""
         if self.is_active():
             return None
         if self.get_available_duration_s() > 1.0:
@@ -148,14 +176,14 @@ class LiveStreamIngest:
             return None
         code = classify_ytdlp_error(output) if output else "youtube_bot_check"
         if code == "youtube_bot_check":
-            return IngestError(code, _bot_check_message())
+            extra = ("\n\nLast ingest log:\n" + self.last_log(12)) if output else ""
+            return IngestError(code, _bot_check_message() + extra)
         return IngestError(
             code,
-            output.strip() or "Live ingest exited before any media arrived. Upload a recording.",
+            (output.strip() or "Live ingest exited before any media arrived. Upload a recording.")
         )
 
     def stop(self) -> None:
-        """Terminate the background ingest process cleanly."""
         self._stop_event.set()
         if self.process is not None and self.process.poll() is None:
             try:
